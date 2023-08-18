@@ -28,19 +28,20 @@ public class BatchApplication implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) throws Exception {
-		logger.info("-".repeat(40));
-
 		LocalDate targetYm = null;
 		try {
-			targetYm = this.parseArgs(args);
-		} catch(Exception e) {
-			logger.error(e.toString());
-			return;
+			logger.info("-".repeat(40));
+
+			try {
+				targetYm = this.parseArgs(args);
+			} catch(Exception e) {
+				logger.error("コマンドライン引数が不正です: " + e.toString());
+				return;
+			}
+			this.appendBillingData(targetYm);
+		} finally {
+			logger.info("-".repeat(40));
 		}
-
-		this.appendBillingData(targetYm);
-
-		logger.info("-".repeat(40));
 	}
 
 	@Transactional
