@@ -48,11 +48,13 @@ public class BatchApplication implements CommandLineRunner {
 	private void appendBillingData(LocalDate targetYm) {
 		int processedCount = 0;
 		String sql = "";
+
+		LocalDate targetYmNextMonth = targetYm.plusMonths(1);
 		String targetYmStr = targetYm.format(DateTimeFormatter.ofPattern("yyyy年MM月"));
 
 		// 請求データを作成してよい対象年月か確認
 		logger.info(String.format("%s分の請求情報を確認しています。", targetYmStr));
-		Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM T_BILLING_STATUS WHERE billing_ym = ? and is_commit = true", Integer.class, targetYm);
+		Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM T_BILLING_STATUS WHERE billing_ym = ? AND is_commit = true", Integer.class, targetYm);
 		if (count != 0) {
 			logger.info(String.format("%s分の請求情報はすでに確定しています。", targetYmStr));
 			return;
@@ -109,16 +111,16 @@ public class BatchApplication implements CommandLineRunner {
 			  M.payment_method,
 			  (SELECT SUM(amount) 
 				 FROM T_CHARGE C 
-				WHERE C.start_date < DATEADD(MONTH, 1, DATE '@@BILLING_YM@@' ) AND 
-					  (C.end_date IS NULL OR C.end_date >= DATE '@@BILLING_YM@@')) as sum_amount,
+				WHERE C.start_date < ? AND 
+					  (C.end_date IS NULL OR C.end_date >= ?)) as sum_amount,
 			  0.1 as tax_ratio
 			FROM T_MEMBER M
 			WHERE
-			  M.start_date < DATEADD(MONTH, 1, DATE '@@BILLING_YM@@') AND 
-			  (M.end_date IS NULL OR M.end_date >= DATE '@@BILLING_YM@@')
+			  M.start_date < ? AND 
+			  (M.end_date IS NULL OR M.end_date >= ?)
 		  )""";
 		sql = sql.replace("@@BILLING_YM@@", targetYm.format(DateTimeFormatter.ISO_DATE));
-		processedCount = jdbcTemplate.update(sql);
+		processedCount = jdbcTemplate.update(sql, targetYmNextMonth, targetYm, targetYmNextMonth, targetYm);
 		logger.info(String.format("%d件追加しました。", processedCount));
 
 		// 請求明細データの作成と挿入
@@ -141,12 +143,12 @@ public class BatchApplication implements CommandLineRunner {
 				C.start_date,
 				C.end_date,
 			  FROM 
-				(SELECT * FROM T_MEMBER WHERE start_date < DATEADD(MONTH, 1, DATE '@@BILLING_YM@@') AND 
-						  (end_date IS NULL OR end_date >= DATE '@@BILLING_YM@@')) M,
-				(SELECT * FROM T_CHARGE WHERE start_date < DATEADD(MONTH, 1, DATE '@@BILLING_YM@@') AND 
-						  (end_date IS NULL OR end_date >= DATE '@@BILLING_YM@@')) C""";
+				(SELECT * FROM T_MEMBER WHERE start_date < ? AND 
+						  (end_date IS NULL OR end_date >= ?)) M,
+				(SELECT * FROM T_CHARGE WHERE start_date < ? AND 
+						  (end_date IS NULL OR end_date >= ?)) C""";
 		sql = sql.replace("@@BILLING_YM@@", targetYm.format(DateTimeFormatter.ISO_DATE));
-		processedCount = jdbcTemplate.update(sql);
+		processedCount = jdbcTemplate.update(sql, targetYmNextMonth, targetYm, targetYmNextMonth, targetYm);
 		logger.info(String.format("%d件追加しました。", processedCount));
 
 	}
